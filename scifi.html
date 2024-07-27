@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Urban Flux - Cyberpunk Parkour</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* background: linear-gradient(240deg, #4d8eeb, #40c6c7); */
+            background: linear-gradient(240deg, #417bcc, #162146);
+
+            font-family: 'Courier New', Courier, monospace; 
+        }
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background-image: url('./background.jpeg'); 
+            background-size: cover;
+            background-position: center;
+            overflow: hidden;
+            box-shadow: 0 0 20px #000000;
+            border-radius: 2%;
+        }
+        #character {
+            position: absolute;
+            width: 30px;
+            height: 50px;
+            background-image: url('./player.png'); 
+            background-size: cover;
+            transition: transform 0.1s;
+            filter: drop-shadow(0 0 10px #00b7ff);
+
+        }
+        .platform {
+            position: absolute;
+            height: 10px;
+            background-color: #00ffff;
+            box-shadow: 0 0 10px #00ffff;
+            /* border-bottom: 4px solid black; */
+            border-top:5px solid rgb(0 72 116);
+        }
+        .collectible {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(45deg, #fd65d2, white);
+            /* background-image: url('./collectable.png'); */
+            /* background-size: cover; */
+            /* transition: transform 0.1s; */
+            border: 2px solid #000000;
+            border-radius: 20%;
+            box-shadow: 0 0 10px #72fff8;
+        }
+        #score, #instructions, #level {
+            position: absolute;
+            color: #00ffff;
+            text-shadow: 0 0 5px #00ffff;
+            background-color: rgba(0, 0, 0, 0.632);
+            border-radius: 5px; 
+            padding: 5px 10px;
+        }
+        #score {
+            top: 10px;
+            right: 10px;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        #level {
+            top: 40px;
+            right: 10px;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        #instructions {
+            top: 10px;
+            left: 10px;
+        }
+        #game-over { 
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #00ffff;
+            font-size: 2em;
+            text-align: center; 
+            display: none; 
+            z-index: 1;
+        }
+        #restart-button {
+            background-color: transparent;
+            border: 2px solid #00ffff;
+            color: #00ffff;
+            font-size: 1.5em;
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: background-color 0.3s, color 0.3s; 
+        }
+        #restart-button:hover {
+            background-color: #00ffff;
+            color: black;
+        }
+        #level-complete { 
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #00ffff;
+            font-size: 2em;
+            text-align: center; 
+            display: none; 
+            z-index: 1;
+        }
+        #next-button {
+            background-color: transparent;
+            border: 2px solid #00ffff;
+            color: #00ffff;
+            font-size: 1.5em;
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: background-color 0.3s, color 0.3s; 
+        }
+        #next-button:hover {
+            background-color: #00ffff;
+            color: black;
+        }
+        #villain {
+            position: absolute;
+            width: 70px;
+            height: 105px;
+            /* background-color: #ff0000; */
+            background-image: url('./villain2.png');
+            background-size: cover;
+            transition: transform 0.1s;
+            /* add background filter to image */
+            filter: drop-shadow(0 0 10px #ff0000);
+        }
+    </style>
+    <audio id="audio" src="./mixkit-unlock-new-item-game-notification-254.wav" preload="auto"></audio>
+    <audio id="audio-levelup" src="./mixkit-video-game-health-recharge-2837.wav" preload="auto"></audio>
+    <audio id="audio-gameover" src="./mixkit-arcade-retro-game-over-213.wav" preload="auto"></audio>
+    <audio id="bgm" src="./mixkit-deep-urban-623.mp3" preload="auto" loop></audio>
+</head>
+<body>
+    <div id="game-container">
+        <div id="character"></div>
+        <div id="villain" class="villain-character"></div>
+        <div id="score">Score: 0</div>
+        <div id="level">level: 1</div>
+        <div id="instructions">Use arrow keys to move, spacebar to jump</div>
+        <div id="game-over">
+            <h2>Game Over!</h2>
+            <button id="restart-button">Restart</button>
+        </div>
+        <div id="level-complete">
+            <h2>Level Completed!</h2>
+            <button id="next-button">Next</button>
+        </div>
+    </div>
+
+    <script>
+        const character = document.getElementById('character');
+        const gameContainer = document.getElementById('game-container');
+        const scoreElement = document.getElementById('score');
+        const gameOverScreen = document.getElementById('game-over');
+        const restartButton = document.getElementById('restart-button'); 
+        const levelCompleteScreen = document.getElementById('level-complete');
+        const nextButton = document.getElementById('next-button');
+        const villain = document.getElementById('villain');
+
+        // Constants 
+        const PLAYER_WIDTH = 30;
+        const PLAYER_HEIGHT = 50;
+        const GROUND_LEVEL = 0;
+        const GRAVITY = 0.5;
+        const JUMP_FORCE = 12;
+        const MAX_JUMP_TIME = 500; // milliseconds
+        const MOVE_SPEED = 5; 
+        const VILLAIN_SPEED = 3;
+
+
+        // Game Variables
+        let position = { x: 50, y: 10 };
+        let velocity = { x: 0, y: 0 };
+        let onGround = false;
+        let score = 0;
+        let jumpStart = 0;
+        let isJumping = false;
+        let isGameOver = false; 
+        let isLevelComplete = false;
+        let level = 1;
+        let villainPosition = { x: 700, y: 10 };
+
+        // Variables (these will be modified during gameplay)
+        let gravity = GRAVITY;
+        let jumpForce = JUMP_FORCE;
+        let moveSpeed = MOVE_SPEED;
+        let villainSpeed = VILLAIN_SPEED;
+        
+
+        // Level Data (Platforms and Collectibles)
+        // Level Data (Platforms and Collectibles)
+const levels = [
+    // Level 1
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 150 },
+            { left: 200, bottom: 60, width: 100 },
+            { left: 350, bottom: 120, width: 200 },
+            { left: 600, bottom: 70, width: 150 },
+            { left: 100, bottom: 200, width: 80 },
+            { left: 400, bottom: 280, width: 120 },
+            { left: 650, bottom: 350, width: 100 }
+        ],
+        collectibles: [
+            { left: 230, bottom: 80 },
+            { left: 450, bottom: 140 },
+            { left: 700, bottom: 90 }
+        ]
+    },
+    // Level 2
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 100 },
+            { left: 150, bottom: 80, width: 80 },
+            { left: 300, bottom: 150, width: 100 },
+            { left: 500, bottom: 100, width: 120 },
+            { left: 650, bottom: 200, width: 90 }
+        ],
+        collectibles: [
+            { left: 170, bottom: 100 },
+            { left: 350, bottom: 170 },
+            { left: 550, bottom: 120 }
+        ]
+    },
+    // Level 3
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 100 },
+            { left: 200, bottom: 150, width: 120 },
+            { left: 100, bottom: 250, width: 80 },
+            { left: 350, bottom: 350, width: 180 },
+            { left: 600, bottom: 200, width: 100 }
+        ],
+        collectibles: [
+            { left: 250, bottom: 170 },
+            { left: 150, bottom: 270 },
+            { left: 650, bottom: 220 }
+        ]
+    },
+    // Level 4
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 180 },
+            { left: 250, bottom: 80, width: 90 },
+            { left: 400, bottom: 180, width: 100 },
+            { left: 550, bottom: 280, width: 120 },
+            { left: 700, bottom: 380, width: 80 },
+        ],
+        collectibles: [
+            { left: 80, bottom: 20 },
+            { left: 300, bottom: 100 },
+            { left: 600, bottom: 300 }
+        ]
+    },
+    // Level 5
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 200 },
+            { left: 300, bottom: 150, width: 120 },
+            { left: 550, bottom: 250, width: 100 },
+            { left: 600, bottom: 70, width: 150 },
+            { left: 100, bottom: 350, width: 80 },
+            { left: 800, bottom: 350, width: 90 },
+            { left: 100, bottom: 450, width: 110 }
+        ],
+        collectibles: [
+            { left: 320, bottom: 180 },
+            { left: 570, bottom: 280 },
+            { left: 120, bottom: 480 }
+        ]
+    },
+    // Level 6
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 220 },
+            { left: 200, bottom: 100, width: 150 },
+            { left: 450, bottom: 200, width: 130 },
+            { left: 700, bottom: 300, width: 120 },
+            { left: 950, bottom: 400, width: 110 }
+        ],
+        collectibles: [
+            { left: 230, bottom: 130 },
+            { left: 480, bottom: 230 },
+            { left: 720, bottom: 330 }
+        ]
+    },
+    // Level 7
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 150 },
+            { left: 250, bottom: 50, width: 100 },
+            { left: 400, bottom: 100, width: 200 },
+            { left: 650, bottom: 150, width: 120 },
+            { left: 900, bottom: 200, width: 140 }
+        ],
+        collectibles: [
+            { left: 270, bottom: 70 },
+            { left: 450, bottom: 120 },
+            { left: 700, bottom: 170 }
+        ]
+    },
+    // Level 8
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 130 },
+            { left: 200, bottom: 50, width: 180 },
+            { left: 500, bottom: 100, width: 160 },
+            { left: 800, bottom: 150, width: 140 },
+            { left: 1100, bottom: 200, width: 120 }
+        ],
+        collectibles: [
+            { left: 230, bottom: 70 },
+            { left: 530, bottom: 120 },
+            { left: 430, bottom: 170 }
+        ]
+    },
+    // Level 9
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 170 },
+            { left: 250, bottom: 70, width: 140 },
+            { left: 450, bottom: 140, width: 180 },
+            { left: 650, bottom: 210, width: 160 },
+            { left: 850, bottom: 280, width: 150 }
+        ],
+        collectibles: [
+            { left: 280, bottom: 100 },
+            { left: 480, bottom: 170 },
+            { left: 680, bottom: 240 }
+        ]
+    },
+    // Level 10
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 190 },
+            { left: 300, bottom: 90, width: 150 },
+            { left: 600, bottom: 180, width: 120 },
+            { left: 900, bottom: 270, width: 140 },
+            { left: 1200, bottom: 360, width: 130 }
+        ],
+        collectibles: [
+            { left: 330, bottom: 110 },
+            { left: 630, bottom: 200 }
+        ]
+    },
+    // Level 11
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 120 },
+            { left: 150, bottom: 40, width: 110 },
+            { left: 350, bottom: 80, width: 100 },
+            { left: 550, bottom: 120, width: 130 },
+            { left: 750, bottom: 160, width: 140 }
+        ],
+        collectibles: [
+            { left: 180, bottom: 60 },
+            { left: 380, bottom: 100 },
+            { left: 580, bottom: 140 }
+        ]
+    },
+    // Level 12
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 160 },
+            { left: 200, bottom: 80, width: 140 },
+            { left: 450, bottom: 160, width: 130 },
+            { left: 700, bottom: 240, width: 120 },
+            { left: 950, bottom: 320, width: 110 }
+        ],
+        collectibles: [
+            { left: 230, bottom: 100 },
+            { left: 480, bottom: 180 },
+            { left: 730, bottom: 260 }
+        ]
+    },
+    // Level 13
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 130 },
+            { left: 180, bottom: 60, width: 120 },
+            { left: 360, bottom: 120, width: 140 },
+            { left: 540, bottom: 180, width: 110 },
+            { left: 720, bottom: 240, width: 130 }
+        ],
+        collectibles: [
+            { left: 210, bottom: 80 },
+            { left: 390, bottom: 140 },
+            { left: 570, bottom: 200 }
+        ]
+    },
+    // Level 14
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 100 },
+            { left: 150, bottom: 50, width: 110 },
+            { left: 300, bottom: 100, width: 130 },
+            { left: 450, bottom: 150, width: 120 },
+            { left: 600, bottom: 200, width: 140 }
+        ],
+        collectibles: [
+            { left: 180, bottom: 70 },
+            { left: 330, bottom: 120 },
+            { left: 480, bottom: 170 }
+        ]
+    },
+    // Level 15
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 180 },
+            { left: 250, bottom: 100, width: 150 },
+            { left: 500, bottom: 200, width: 140 },
+            { left: 750, bottom: 300, width: 130 },
+            { left: 1000, bottom: 400, width: 120 }
+        ],
+        collectibles: [
+            { left: 280, bottom: 130 },
+            { left: 530, bottom: 230 },
+            { left: 780, bottom: 330 }
+        ]
+    },
+    // Level 16
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 190 },
+            { left: 300, bottom: 150, width: 160 },
+            { left: 600, bottom: 300, width: 150 },
+            { left: 900, bottom: 450, width: 140 },
+            { left: 1200, bottom: 600, width: 130 }
+        ],
+        collectibles: [
+            { left: 330, bottom: 180 },
+            { left: 630, bottom: 330 },
+            { left: 430, bottom: 480 }
+        ]
+    },
+    // Level 17
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 140 },
+            { left: 250, bottom: 75, width: 130 },
+            { left: 500, bottom: 150, width: 120 },
+            { left: 750, bottom: 225, width: 140 },
+            { left: 1000, bottom: 300, width: 130 }
+        ],
+        collectibles: [
+            { left: 280, bottom: 100 },
+            { left: 530, bottom: 175 },
+            { left: 780, bottom: 250 }
+        ]
+    },
+    // Level 18
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 180 },
+            { left: 300, bottom: 120, width: 170 },
+            { left: 600, bottom: 240, width: 160 },
+            { left: 900, bottom: 360, width: 150 },
+            { left: 1200, bottom: 480, width: 140 }
+        ],
+        collectibles: [
+            { left: 330, bottom: 150 },
+            { left: 630, bottom: 270 },
+            { left: 230, bottom: 340 }
+        ]
+    },
+    // Level 19
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 130 },
+            { left: 200, bottom: 80, width: 120 },
+            { left: 400, bottom: 160, width: 150 },
+            { left: 600, bottom: 240, width: 140 },
+            { left: 800, bottom: 320, width: 130 }
+        ],
+        collectibles: [
+            { left: 230, bottom: 110 },
+            { left: 430, bottom: 190 },
+            { left: 630, bottom: 270 }
+        ]
+    },
+    // Level 20
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 170 },
+            { left: 250, bottom: 100, width: 160 },
+            { left: 500, bottom: 200, width: 150 },
+            { left: 750, bottom: 300, width: 140 },
+            { left: 1000, bottom: 400, width: 130 }
+        ],
+        collectibles: [
+            { left: 280, bottom: 130 },
+            { left: 530, bottom: 230 },
+            { left: 780, bottom: 330 }
+        ]
+    },
+    // Level 21
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 190 },
+            { left: 300, bottom: 90, width: 140 },
+            { left: 600, bottom: 180, width: 130 },
+            { left: 900, bottom: 270, width: 120 },
+            { left: 1200, bottom: 360, width: 110 }
+        ],
+        collectibles: [
+            { left: 330, bottom: 110 },
+            { left: 630, bottom: 200 },
+            { left: 430, bottom: 270 }
+        ]
+    },
+    // Level 22
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 150 },
+            { left: 250, bottom: 60, width: 120 },
+            { left: 500, bottom: 120, width: 110 },
+            { left: 750, bottom: 180, width: 130 },
+            { left: 1000, bottom: 240, width: 140 }
+        ],
+        collectibles: [
+            { left: 280, bottom: 90 },
+            { left: 530, bottom: 150 },
+            { left: 780, bottom: 210 }
+        ]
+    },
+    // Level 23
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 200 },
+            { left: 300, bottom: 100, width: 160 },
+            { left: 600, bottom: 200, width: 140 },
+            { left: 900, bottom: 300, width: 130 },
+            { left: 1200, bottom: 400, width: 110 }
+        ],
+        collectibles: [
+            { left: 330, bottom: 130 },
+            { left: 630, bottom: 230 },
+            { left: 310, bottom: 330 }
+        ]
+    },
+    // Level 24
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 110 },
+            { left: 200, bottom: 50, width: 120 },
+            { left: 400, bottom: 100, width: 130 },
+            { left: 600, bottom: 150, width: 140 },
+            { left: 800, bottom: 200, width: 150 }
+        ],
+        collectibles: [
+            { left: 230, bottom: 70 },
+            { left: 430, bottom: 120 },
+            { left: 630, bottom: 170 }
+        ]
+    },
+    // Level 25
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 180 },
+            { left: 250, bottom: 80, width: 170 },
+            { left: 500, bottom: 160, width: 160 },
+            { left: 750, bottom: 240, width: 150 },
+            { left: 1000, bottom: 320, width: 140 }
+        ],
+        collectibles: [
+            { left: 280, bottom: 110 },
+            { left: 530, bottom: 190 },
+            { left: 780, bottom: 270 }
+        ]
+    },
+    // Level 26
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 170 },
+            { left: 300, bottom: 90, width: 160 },
+            { left: 600, bottom: 180, width: 150 },
+            { left: 900, bottom: 270, width: 140 },
+            { left: 1200, bottom: 360, width: 130 }
+        ],
+        collectibles: [
+            { left: 330, bottom: 120 },
+            { left: 630, bottom: 210 },
+            { left: 430, bottom: 300 }
+        ]
+    },
+    // Level 27
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 140 },
+            { left: 200, bottom: 70, width: 130 },
+            { left: 400, bottom: 140, width: 120 },
+            { left: 600, bottom: 210, width: 110 },
+            { left: 800, bottom: 280, width: 100 }
+        ],
+        collectibles: [
+            { left: 230, bottom: 100 },
+            { left: 430, bottom: 170 },
+            { left: 630, bottom: 240 }
+        ]
+    },
+    // Level 28
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 190 },
+            { left: 300, bottom: 100, width: 180 },
+            { left: 600, bottom: 200, width: 170 },
+            { left: 900, bottom: 300, width: 160 },
+            { left: 1200, bottom: 400, width: 150 }
+        ],
+        collectibles: [
+            { left: 330, bottom: 130 },
+            { left: 630, bottom: 230 },
+            { left: 630, bottom: 330 }
+        ]
+    },
+    // Level 29
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 120 },
+            { left: 200, bottom: 60, width: 110 },
+            { left: 400, bottom: 120, width: 100 },
+            { left: 600, bottom: 180, width: 90 },
+            { left: 800, bottom: 240, width: 80 }
+        ],
+        collectibles: [
+            { left: 230, bottom: 90 },
+            { left: 430, bottom: 150 },
+            { left: 630, bottom: 210 }
+        ]
+    },
+    // Level 30
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 130 },
+            { left: 250, bottom: 80, width: 120 },
+            { left: 500, bottom: 160, width: 110 },
+            { left: 750, bottom: 240, width: 100 },
+            { left: 1000, bottom: 320, width: 90 }
+        ],
+        collectibles: [
+            { left: 280, bottom: 110 },
+            { left: 530, bottom: 190 },
+            { left: 780, bottom: 270 }
+        ]
+    },
+    // Level 31
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 160 },
+            { left: 300, bottom: 100, width: 150 },
+            { left: 600, bottom: 200, width: 140 },
+            { left: 900, bottom: 300, width: 130 },
+            { left: 1200, bottom: 400, width: 120 }
+        ],
+        collectibles: [
+            { left: 330, bottom: 130 },
+            { left: 630, bottom: 230 },
+            { left: 730, bottom: 330 }
+        ]
+    },
+    // Level 32
+    {
+        platforms: [
+            { left: 0, bottom: 0, width: 170 },
+            { left: 200, bottom: 80, width: 160 },
+            { left: 400, bottom: 160, width: 150 },
+            { left: 600, bottom: 240, width: 140 },
+            { left: 800, bottom: 320, width: 130 }
+        ],
+        collectibles: [
+            { left: 230, bottom: 110 },
+            { left: 430, bottom: 190 },
+            { left: 630, bottom: 270 }
+        ]
+    },
+]
+ 
+        let currentLevel = levels[level - 1]; 
+        let platforms = currentLevel.platforms;
+        let collectibles = currentLevel.collectibles;
+
+        // Create Platforms 
+        function createPlatforms() {
+            platforms.forEach(platform => {
+                const el = document.createElement('div');
+                el.className = 'platform';
+                el.style.left = platform.left + 'px';
+                el.style.bottom = platform.bottom + 'px';
+                el.style.width = platform.width + 'px';
+                gameContainer.appendChild(el);
+            });
+        }
+
+        // Create Collectibles
+        function createCollectibles() {
+            collectibles.forEach(collectible => {
+                const el = document.createElement('div');
+                el.className = 'collectible';
+                el.style.left = collectible.left + 'px';
+                el.style.bottom = collectible.bottom + 'px';
+                gameContainer.appendChild(el);
+            });
+        }        
+
+        function updateCharacter() {
+            character.style.left = position.x + 'px';
+            character.style.bottom = position.y + 'px';
+        }
+
+
+        function checkPlatformCollisions() {
+            // 1. Game Over Check
+            if (position.y < GROUND_LEVEL) {
+                gameOver();
+                return; 
+            }
+
+            // 2. Reset onGround 
+            onGround = false;
+
+            for (let platform of platforms) {
+                // 3. Check Horizontal Overlap
+                if (position.x < platform.left + platform.width &&
+                    position.x + PLAYER_WIDTH > platform.left) {
+
+                // 4. Check if landing on top of platform
+                if (position.y + PLAYER_HEIGHT > platform.bottom && 
+                    position.y <= platform.bottom + 10) {
+                    onGround = true;
+                    position.y = platform.bottom + 10;
+                    velocity.y = 0;
+                    break; 
+                }
+                }
+            }
+        }
+
+        
+        function checkCollectibleCollisions() {
+            for (let i = collectibles.length - 1; i >= 0; i--) { 
+                const collectible = collectibles[i];
+                if (position.x < collectible.left + 20 &&
+                    position.x + PLAYER_WIDTH > collectible.left &&
+                    position.y < collectible.bottom + 20 &&
+                    position.y + PLAYER_HEIGHT > collectible.bottom) {
+
+                    score += 10;
+                    scoreElement.textContent = `Score: ${score}`;
+                    
+                    collectibles.splice(i, 1); 
+                    gameContainer.removeChild(gameContainer.querySelectorAll('.collectible')[i]);
+                    // document.getElementById('audio').play();
+                    // increase speed of the audio
+                    document.getElementById('audio').playbackRate = 2.5;
+                    document.getElementById('audio').play();
+                    if (collectibles.length === 0) {
+                        // levelUp();
+                        levelComplete();
+                    }
+                    break; 
+                }
+            }
+        }
+
+
+        function gameLoop(timestamp) {
+            if (!isGameOver) {
+                if (!isLevelComplete) {
+                    // Movement and Jumping
+                    if (isJumping) {
+                        const jumpTime = timestamp - jumpStart;
+                        if (jumpTime < MAX_JUMP_TIME) {
+                            velocity.y = JUMP_FORCE * (1 - jumpTime / MAX_JUMP_TIME); 
+                        } else {
+                            isJumping = false;
+                        }
+                    } 
+
+                    position.x += velocity.x;
+                    position.y += velocity.y;
+
+                    if (!onGround) {
+                        velocity.y -= GRAVITY; 
+                    }
+
+                    position.x = Math.max(0, Math.min(800 - PLAYER_WIDTH, position.x));
+                    
+                    checkPlatformCollisions();
+                    checkCollectibleCollisions();
+                    updateCharacter();
+                    updateVillain();
+                    checkVillainCollision();
+                }
+
+                requestAnimationFrame(gameLoop);
+                // document.getElementById('bgm').volume = 0.5;
+            }
+        }
+
+        function gameOver() {
+            isGameOver = true;
+            gameOverScreen.style.display = 'flex'; 
+            document.getElementById('audio-gameover').play();
+            document.getElementById('bgm').pause();
+        }
+        
+        function levelComplete() {
+            isLevelComplete = true;
+            levelCompleteScreen.style.display = 'flex';
+        }
+
+
+        function resetGame() {
+            level = 1;
+            currentLevel = levels[level - 1];
+            platforms = currentLevel.platforms;
+            collectibles = currentLevel.collectibles;
+
+            position = { x: 50, y: 10 };
+            velocity = { x: 0, y: 0 };
+            onGround = false;
+            score = 0;
+            scoreElement.textContent = "Score: 0"; 
+            isGameOver = false;
+
+            updateCharacter();
+
+            const platformsInGame = gameContainer.querySelectorAll('.platform');
+            platformsInGame.forEach(platform => {
+                gameContainer.removeChild(platform);
+            });
+            const collectiblesInGame = gameContainer.querySelectorAll('.collectible');
+            collectiblesInGame.forEach(collectible => {
+                gameContainer.removeChild(collectible);
+            });
+            collectibles = [...currentLevel.collectibles]; // Make a copy of the original collectibles
+            
+            //for villain:
+            villainPosition = { x: 700, y: 10 };
+            villain.style.left = villainPosition.x + 'px';
+            villain.style.bottom = villainPosition.y + 'px';
+
+            createPlatforms();
+            createCollectibles();
+
+            gameOverScreen.style.display = 'none'; 
+
+            gameLoop();
+            // refresh the webpage
+            location.reload();
+        }
+
+        function levelUp() {
+            level++;
+            document.getElementById('audio-levelup').play();
+            document.getElementById('level').textContent = `Level: ${level}`;
+            if (level <= levels.length) {
+                currentLevel = levels[level - 1];
+                platforms = currentLevel.platforms;
+                collectibles = currentLevel.collectibles;
+
+                // Reset player position and velocity
+                position = { x: 50, y: 10 };
+                velocity = { x: 0, y: 0 };
+                onGround = false;
+                isJumping = false;
+
+                // // Reset movement and jump parameters
+                // moveSpeed = MOVE_SPEED;
+                // jumpForce = JUMP_FORCE;
+                // gravity = GRAVITY;
+
+                // // Reset villain position and speed
+                villainPosition = { x: 700, y: 10 };
+                // villainSpeed = VILLAIN_SPEED;
+
+                // Remove existing platforms and collectibles
+                const platformsInGame = gameContainer.querySelectorAll('.platform');
+                platformsInGame.forEach(platform => {
+                    gameContainer.removeChild(platform);
+                });
+                const collectiblesInGame = gameContainer.querySelectorAll('.collectible');
+                collectiblesInGame.forEach(collectible => {
+                    gameContainer.removeChild(collectible);
+                });
+
+                createPlatforms();
+                createCollectibles();
+
+                updateCharacter();
+                villain.style.left = villainPosition.x + 'px';
+                villain.style.bottom = villainPosition.y + 'px';
+
+                isLevelComplete = false;
+                levelCompleteScreen.style.display = 'none';
+
+                // Restart the game loop
+                // requestAnimationFrame(gameLoop);
+            } else {
+                gameOver(); // Or some other end-of-game logic
+            }
+        }
+  
+        function updateVillain() {
+            // Move towards the player
+            const dx = position.x - villainPosition.x;
+            const dy = position.y - villainPosition.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance > 0) {
+                villainPosition.x += (dx / distance) * VILLAIN_SPEED;
+                villainPosition.y += (dy / distance) * VILLAIN_SPEED;
+            }
+
+            // Apply gravity to villain
+            if (!isVillainOnPlatform()) {
+                villainPosition.y -= GRAVITY;
+            }
+
+            // Keep villain within game boundaries
+            villainPosition.x = Math.max(0, Math.min(800 - 30, villainPosition.x));
+            villainPosition.y = Math.max(0, villainPosition.y);
+
+            villain.style.left = villainPosition.x + 'px';
+            villain.style.bottom = villainPosition.y + 'px';
+
+            // Face the direction of movement
+            if (dx > 0) {
+                villain.style.transform = 'scaleX(1) scale(0.7)';
+            } else if (dx < 0) {
+                villain.style.transform = 'scaleX(-1) scale(0.7)';
+            }
+        }
+
+        function isVillainOnPlatform() {
+            for (let platform of platforms) {
+                if (villainPosition.x < platform.left + platform.width &&
+                    villainPosition.x + 30 > platform.left &&
+                    villainPosition.y <= platform.bottom + 10 &&
+                    villainPosition.y > platform.bottom) {
+                    villainPosition.y = platform.bottom + 10;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function checkVillainCollision() {
+            const dx = position.x - villainPosition.x;
+            const dy = position.y - villainPosition.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < 30) { // Assuming a collision distance of 30 pixels
+                gameOver();
+            }
+        }
+
+
+        document.addEventListener('keydown', (e) => {
+            console.log(isLevelComplete)
+            if (!isGameOver && !isLevelComplete) {
+                switch(e.key) {
+                    case 'ArrowLeft':
+                        velocity.x = -MOVE_SPEED;
+                        character.style.transform = 'scaleX(-1)';
+                        break;
+                    case 'ArrowRight':
+                        velocity.x = MOVE_SPEED;
+                        character.style.transform = 'scaleX(1)'; 
+                        break;
+                    case ' ':
+                        if (onGround && !isJumping) { 
+                            isJumping = true;
+                            jumpStart = performance.now(); 
+                        }
+                        break;
+                }
+            } 
+            document.getElementById('bgm').play();
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && (!isGameOver && !isLevelComplete)) {
+                velocity.x = 0;
+            }
+        });
+
+        restartButton.addEventListener('click', resetGame); 
+        nextButton.addEventListener('click', levelUp);
+
+        createPlatforms(); 
+        createCollectibles();
+        gameLoop(); 
+
+    </script>
+</body>
+</html>
